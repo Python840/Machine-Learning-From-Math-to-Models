@@ -36,4 +36,4 @@ This GitHub repository serves as a **companion resource** to the book, featuring
 ## 💻 How to Use This Repo  
 1️⃣ **Clone this repository:**  
 ```bash
-git clone https://github.com/YourGitHubUsername/Machine-Learning-From-Math-to-Models.git
+git clone https://github.com/Python840/Machine-Learning-From-Math-to-Models.git
