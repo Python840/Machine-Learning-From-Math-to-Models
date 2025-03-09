@@ -16,7 +16,7 @@ This GitHub repository serves as a **companion resource** to the book, featuring
 ✔ **💡 CodePen & GitHub Integration** – Run ML models directly in your browser, no installation needed!  
 ✔ **🎮 (Future) Learning Through a Game** – A first-person ML puzzle game in development!  
 
-🔹 **Want to start learning?** Explore the [📂 Code Folder](./Code/) and run your first ML models!  
+🔹 **Want to start learning?** Explore the [📂 Code Folder](./code/) and run your first ML models!  
 
 ---
 
