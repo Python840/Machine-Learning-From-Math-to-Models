@@ -22,7 +22,7 @@ You can **download** them, **copy-paste** into your own projects, or **visit liv
 
 ---
 
-### **➡️ Option 2: Copy-Paste Code (Example**
+### **➡️ Option 2: Copy-Paste Code (Example)**
 If you don’t want to download, you can manually copy-paste the code from:  
 - **`SVM.html`** → The main HTML structure.  
 - **`SVM.css`** → The styling.  
