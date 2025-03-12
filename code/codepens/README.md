@@ -11,22 +11,30 @@ You can **download** them, **copy-paste** into your own projects, or **visit liv
 - **`.css`** → Styling (CSS)  
 - **`.js`** → JavaScript logic  
 
+
+---
+
 ### **➡️ Option 1: Download & Run Locally**
 1. Click the **Download ZIP** button on GitHub.  
-2. Extract the files and open **`index.html`** in your browser.  
-3. Modify the files as needed!  
+2. Extract the files to your local computer.  
+3. Open the folder of the snippet you want (e.g., `SVM/`).  
+4. Open **`SVM.html`** in your browser—this will automatically load the CSS & JS.  
 
-### **➡️ Option 2: Copy-Paste Code**
-You can **manually copy and paste** the code from the `.html`, `.css`, and `.js` files into your own projects.
+---
+
+### **➡️ Option 2: Copy-Paste Code (Example**
+If you don’t want to download, you can manually copy-paste the code from:  
+- **`SVM.html`** → The main HTML structure.  
+- **`SVM.css`** → The styling.  
+- **`SVM.js`** → The logic.  
+
+---
 
 ### **➡️ Option 3: Try CodePens (Live Demos)**
 Some snippets are **already hosted on CodePen** for direct interaction. Click the links below! 🔥  
 
----
-
-## 📜 **Existing CodePens**
-🔗 **Support Vector Machines (SVM) Visualization**  
-[![SVM CodePen](https://codepen.io/Hunter_Python840/full/azbVNEw)](https://codepen.io/Hunter_Python840/full/azbVNEw)  
+#### **🔗 Support Vector Machines (SVM) Visualization**
+[🔗 View on CodePen](https://codepen.io/Hunter_Python840/full/azbVNEw)  
 
 🚀 **More CodePens Coming Soon!** Future topics include:  
 - Decision Trees 🌳  
