@@ -1,0 +1,20 @@
+<!-- MathJax for LaTeX rendering -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<!-- Plotly library -->
+<script src="https://cdn.plot.ly/plotly-2.18.2.min.js"></script>
+
+<div id="app">
+  <!-- Left Panel: Explanations & Navigation -->
+  <div id="left-panel">
+    <div id="left-content"></div>
+    <div id="nav-buttons">
+      <button id="prevBtn" disabled>Back</button>
+      <button id="nextBtn">Next</button>
+    </div>
+  </div>
+  <!-- Right Panel: LaTeX formulas (slides 1-4) or Plotly 3D graph (slide 5) -->
+  <div id="right-panel">
+    <div id="latex-container"></div>
+    <div id="plot-container" style="display: none;"></div>
+  </div>
+</div>
