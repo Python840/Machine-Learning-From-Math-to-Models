@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neural Network Playground</title>
+<style>
+  /* General layout */
+  body {
+    margin: 0;
+    padding: 0;
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    height: 100vh;
+  }
+  #sidebar {
+    width: 320px;
+    background: #161b22;
+    box-shadow: 0 0 10px #000000aa;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  #sidebar h1 {
+    color: #58a6ff;
+    text-align: center;
+    margin-top: 0;
+  }
+  #sidebar label {
+    font-size: 14px;
+    font-weight: bold;
+    display: block;
+    margin-top: 15px;
+  }
+  #sidebar input[type=range],
+  #sidebar select,
+  #sidebar button {
+    width: 100%;
+    margin-top: 5px;
+    padding: 6px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    border-radius: 3px;
+  }
+  #sidebar button:hover {
+    background: #238636;
+  }
+  #main {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #chart {
+    width: 100%;
+    height: 150px;
+    background: #0d1117;
+    border-top: 1px solid #30363d;
+  }
+  #canvasWrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+  canvas {
+    background: #0d1117;
+    border: 1px solid #30363d;
+  }
+  #log {
+    background: #161b22;
+    border-top: 1px solid #30363d;
+    width: 100%;
+    height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    padding: 10px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h1>Neural Network Playground</h1>
+  <label for="layers">Layers: <span id="layersValue">3</span></label>
+  <input type="range" id="layers" min="1" max="8" value="3" />
+  <label for="neurons">Neurons/Layer: <span id="neuronsValue">4</span></label>
+  <input type="range" id="neurons" min="1" max="10" value="4" />
+  <label for="activation">Activation</label>
+  <select id="activation">
+    <option value="relu">ReLU</option>
+    <option value="sigmoid">Sigmoid</option>
+    <option value="tanh">Tanh</option>
+    <option value="linear">Linear</option>
+  </select>
+  <label for="optimizer">Optimizer</label>
+  <select id="optimizer">
+    <option value="sgd">SGD</option>
+    <option value="momentum">Momentum</option>
+    <option value="rmsprop">RMSProp</option>
+    <option value="adam">Adam</option>
+  </select>
+  <label for="dataset">Dataset</label>
+  <select id="dataset">
+    <option value="spiral">Spiral</option>
+    <option value="circle">Circle</option>
+    <option value="xor">XOR</option>
+  </select>
+  <button id="initBtn">Initialize</button>
+  <button id="trainBtn">Train</button>
+  <button id="resetBtn">Reset</button>
+  <button id="toggleLogBtn">Toggle Log</button>
+</div>
+<div id="main">
+  <div id="canvasWrapper">
+    <canvas id="view" width="800" height="600"></canvas>
+  </div>
+  <canvas id="lossChart" width="800" height="150"></canvas>
+  <div id="log"></div>
+</div>
+<script>
+/* Core structures */
+class Layer {
+  constructor(size, activation) {
+    this.size = size;
+    this.activation = activation;
+    this.z = new Array(size).fill(0);
+    this.a = new Array(size).fill(0);
+    this.bias = new Array(size).fill(0).map(() => Math.random() - 0.5);
+  }
+}
+class Network {
+  constructor(layerSizes, activation) {
+    this.layers = [];
+    for (let i = 0; i < layerSizes.length; i++) {
+      this.layers.push(new Layer(layerSizes[i], activation));
+    }
+    this.weights = [];
+    for (let i = 0; i < layerSizes.length - 1; i++) {
+      const from = layerSizes[i];
+      const to = layerSizes[i + 1];
+      const mat = [];
+      for (let j = 0; j < from; j++) {
+        mat.push(new Array(to).fill(0).map(() => Math.random() - 0.5));
+      }
+      this.weights.push(mat);
+    }
+  }
+  forward(x) {
+    this.layers[0].a = x.slice();
+    for (let l = 1; l < this.layers.length; l++) {
+      const prev = this.layers[l - 1];
+      const curr = this.layers[l];
+      for (let j = 0; j < curr.size; j++) {
+        let sum = curr.bias[j];
+        for (let i = 0; i < prev.size; i++) {
+          sum += prev.a[i] * this.weights[l - 1][i][j];
+        }
+        curr.z[j] = sum;
+        curr.a[j] = Network.activate(sum, curr.activation);
+      }
+    }
+    return this.layers[this.layers.length - 1].a.slice();
+  }
+  static activate(x, act) {
+    if (act === 'relu') return Math.max(0, x);
+    if (act === 'sigmoid') return 1 / (1 + Math.exp(-x));
+    if (act === 'tanh') return Math.tanh(x);
+    return x;
+  }
+}
+
+class Optimizer {
+  constructor(lr){ this.lr = lr; }
+  step(network, grads){}
+}
+class SGD extends Optimizer {
+  step(network, grads){
+    for(let l=0;l<network.weights.length;l++){
+      for(let i=0;i<network.weights[l].length;i++){
+        for(let j=0;j<network.weights[l][i].length;j++){
+          network.weights[l][i][j]-=this.lr*grads.weights[l][i][j];
+        }
+      }
+      for(let j=0;j<network.layers[l+1].bias.length;j++){
+        network.layers[l+1].bias[j]-=this.lr*grads.bias[l][j];
+      }
+    }
+  }
+}
+class Momentum extends Optimizer {
+  constructor(lr, m=0.9){ super(lr); this.m=m; this.vw=[]; this.vb=[]; }
+  step(network, grads){
+    if(this.vw.length===0){
+      for(let l=0;l<network.weights.length;l++){
+        this.vw.push(network.weights[l].map(row=>row.map(()=>0)));
+        this.vb.push(new Array(network.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<network.weights.length;l++){
+      for(let i=0;i<network.weights[l].length;i++){
+        for(let j=0;j<network.weights[l][i].length;j++){
+          this.vw[l][i][j]=this.m*this.vw[l][i][j]+(1-this.m)*grads.weights[l][i][j];
+          network.weights[l][i][j]-=this.lr*this.vw[l][i][j];
+        }
+      }
+      for(let j=0;j<network.layers[l+1].bias.length;j++){
+        this.vb[l][j]=this.m*this.vb[l][j]+(1-this.m)*grads.bias[l][j];
+        network.layers[l+1].bias[j]-=this.lr*this.vb[l][j];
+      }
+    }
+  }
+}
+class RMSProp extends Optimizer {
+  constructor(lr, decay=0.9, eps=1e-8){ super(lr); this.decay=decay; this.eps=eps; this.sw=[]; this.sb=[]; }
+  step(network, grads){
+    if(this.sw.length===0){
+      for(let l=0;l<network.weights.length;l++){
+        this.sw.push(network.weights[l].map(row=>row.map(()=>0)));
+        this.sb.push(new Array(network.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<network.weights.length;l++){
+      for(let i=0;i<network.weights[l].length;i++){
+        for(let j=0;j<network.weights[l][i].length;j++){
+          this.sw[l][i][j]=this.decay*this.sw[l][i][j]+(1-this.decay)*grads.weights[l][i][j]**2;
+          network.weights[l][i][j]-=this.lr*grads.weights[l][i][j]/Math.sqrt(this.sw[l][i][j]+this.eps);
+        }
+      }
+      for(let j=0;j<network.layers[l+1].bias.length;j++){
+        this.sb[l][j]=this.decay*this.sb[l][j]+(1-this.decay)*grads.bias[l][j]**2;
+        network.layers[l+1].bias[j]-=this.lr*grads.bias[l][j]/Math.sqrt(this.sb[l][j]+this.eps);
+      }
+    }
+  }
+}
+class Adam extends Optimizer {
+  constructor(lr, b1=0.9, b2=0.999, eps=1e-8){ super(lr); this.b1=b1; this.b2=b2; this.eps=eps; this.mw=[]; this.vw=[]; this.mb=[]; this.vb=[]; this.t=0; }
+  step(network, grads){
+    if(this.mw.length===0){
+      for(let l=0;l<network.weights.length;l++){
+        this.mw.push(network.weights[l].map(row=>row.map(()=>0)));
+        this.vw.push(network.weights[l].map(row=>row.map(()=>0)));
+        this.mb.push(new Array(network.layers[l+1].bias.length).fill(0));
+        this.vb.push(new Array(network.layers[l+1].bias.length).fill(0));
+      }
+    }
+    this.t++;
+    for(let l=0;l<network.weights.length;l++){
+      for(let i=0;i<network.weights[l].length;i++){
+        for(let j=0;j<network.weights[l][i].length;j++){
+          this.mw[l][i][j]=this.b1*this.mw[l][i][j]+(1-this.b1)*grads.weights[l][i][j];
+          this.vw[l][i][j]=this.b2*this.vw[l][i][j]+(1-this.b2)*grads.weights[l][i][j]**2;
+          const mc=this.mw[l][i][j]/(1-Math.pow(this.b1,this.t));
+          const vc=this.vw[l][i][j]/(1-Math.pow(this.b2,this.t));
+          network.weights[l][i][j]-=this.lr*mc/(Math.sqrt(vc)+this.eps);
+        }
+      }
+      for(let j=0;j<network.layers[l+1].bias.length;j++){
+        this.mb[l][j]=this.b1*this.mb[l][j]+(1-this.b1)*grads.bias[l][j];
+        this.vb[l][j]=this.b2*this.vb[l][j]+(1-this.b2)*grads.bias[l][j]**2;
+        const mc=this.mb[l][j]/(1-Math.pow(this.b1,this.t));
+        const vc=this.vb[l][j]/(1-Math.pow(this.b2,this.t));
+        network.layers[l+1].bias[j]-=this.lr*mc/(Math.sqrt(vc)+this.eps);
+      }
+    }
+  }
+}
+/* dataset generation */
+function generateData(name) {
+  const pts = [];
+  const labels = [];
+  if (name === 'spiral') {
+    const N = 100;
+    for (let i = 0; i < N; i++) {
+      const r = i / N;
+      const t = 4 * Math.PI * r + (Math.random() * 0.2);
+      const x = r * Math.cos(t);
+      const y = r * Math.sin(t);
+      pts.push([x, y]);
+      labels.push(t % (2 * Math.PI) < Math.PI ? 0 : 1);
+    }
+  } else if (name === 'circle') {
+    const N = 100;
+    for (let i = 0; i < N; i++) {
+      const angle = Math.random() * 2 * Math.PI;
+      const r = Math.random();
+      const x = r * Math.cos(angle);
+      const y = r * Math.sin(angle);
+      pts.push([x, y]);
+      labels.push(r > 0.5 ? 1 : 0);
+    }
+  } else if (name === 'xor') {
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() > 0.5 ? 1 : 0;
+      const y = Math.random() > 0.5 ? 1 : 0;
+      pts.push([x, y]);
+      labels.push(x ^ y);
+    }
+  }
+  return { pts, labels };
+}
+/* Visualization utilities */
+const canvas = document.getElementById('view');
+const ctx = canvas.getContext('2d');
+const sidebar = document.getElementById('sidebar');
+const layersInput = document.getElementById('layers');
+const neuronsInput = document.getElementById('neurons');
+const activationInput = document.getElementById('activation');
+const optimizerInput = document.getElementById('optimizer');
+const datasetInput = document.getElementById('dataset');
+const logDiv = document.getElementById('log');
+const logBtn = document.getElementById('toggleLogBtn');
+let network = null;
+let data = generateData(datasetInput.value);
+let training = false;
+let lossHistory = [];
+const chartCanvas = document.getElementById('lossChart');
+const chartCtx = chartCanvas.getContext('2d');
+let optimizer = new SGD(0.03);
+
+function drawChart() {
+  chartCtx.clearRect(0,0,chartCanvas.width,chartCanvas.height);
+  chartCtx.strokeStyle = '#58a6ff';
+  chartCtx.beginPath();
+  for (let i = 0; i < lossHistory.length; i++) {
+    const x = (i / Math.max(1, lossHistory.length-1)) * chartCanvas.width;
+    const y = chartCanvas.height - lossHistory[i] * chartCanvas.height;
+    if (i === 0) chartCtx.moveTo(x, y);
+    else chartCtx.lineTo(x, y);
+  }
+  chartCtx.stroke();
+}
+function log(msg) {
+  const el = document.createElement('div');
+  el.textContent = msg;
+  logDiv.appendChild(el);
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+function drawPoint(x, y, label) {
+  const scale = 250;
+  ctx.fillStyle = label ? '#ff7b72' : '#58a6ff';
+  ctx.beginPath();
+  ctx.arc(canvas.width/2 + x * scale, canvas.height/2 + y * scale, 4, 0, 2*Math.PI);
+  ctx.fill();
+}
+function drawNetwork() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for (let i = 0; i < data.pts.length; i++) {
+    drawPoint(data.pts[i][0], data.pts[i][1], data.labels[i]);
+  }
+  const layerGap = canvas.width / (network.layers.length + 1);
+  for (let l = 0; l < network.layers.length; l++) {
+    const layer = network.layers[l];
+    const neuronGap = canvas.height / (layer.size + 1);
+    for (let n = 0; n < layer.size; n++) {
+      const x = layerGap * (l + 1);
+      const y = neuronGap * (n + 1);
+      ctx.fillStyle = '#8b949e';
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, 2*Math.PI);
+      ctx.fill();
+      if (l > 0) {
+        const prev = network.layers[l-1];
+        const prevGap = canvas.height / (prev.size + 1);
+        for (let p = 0; p < prev.size; p++) {
+          const px = layerGap * l;
+          const py = prevGap * (p + 1);
+          const w = network.weights[l-1][p][n];
+          ctx.strokeStyle = w > 0 ? `rgba(100, 200, 255, ${Math.abs(w)})` : `rgba(255, 100, 100, ${Math.abs(w)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+function initializeNetwork() {
+  const layers = parseInt(layersInput.value);
+  const neurons = parseInt(neuronsInput.value);
+  const sizes = new Array(layers).fill(neurons);
+  sizes.unshift(data.pts[0].length);
+  sizes.push(2);
+  network = new Network(sizes, activationInput.value);
+  const opt = optimizerInput.value;
+  if(opt==='sgd') optimizer = new SGD(0.03);
+  else if(opt==='momentum') optimizer = new Momentum(0.03,0.9);
+  else if(opt==='rmsprop') optimizer = new RMSProp(0.001);
+  else optimizer = new Adam(0.001);
+  lossHistory = [];
+  drawChart();
+  drawNetwork();
+  log('Network initialized with '+opt);
+}
+function step() {
+  if (!training) return;
+  let loss = 0;
+  const grads = {weights:[],bias:[]};
+  for (let l=0;l<network.weights.length;l++){
+    grads.weights.push(network.weights[l].map(row=>row.map(()=>0)));
+    grads.bias.push(new Array(network.layers[l+1].bias.length).fill(0));
+  }
+  for (let i = 0; i < data.pts.length; i++) {
+    const x = data.pts[i];
+    const y = [data.labels[i], 1 - data.labels[i]];
+    const output = network.forward(x);
+    const deltas = [];
+    for (let l = network.layers.length - 1; l >= 1; l--) {
+      const layer = network.layers[l];
+      const prev = network.layers[l-1];
+      const delta = new Array(layer.size).fill(0);
+      if (l === network.layers.length - 1) {
+        for (let j = 0; j < layer.size; j++) {
+          const a = layer.a[j];
+          delta[j] = a - y[j];
+        }
+      } else {
+        for (let j = 0; j < layer.size; j++) {
+          let sum = 0;
+          const next = deltas[0];
+          for (let k = 0; k < next.length; k++) {
+            sum += next[k] * network.weights[l][j][k];
+          }
+          const a = layer.a[j];
+          const dAct = layer.activation === 'relu' ? (a > 0 ? 1 : 0) : (layer.activation === 'sigmoid' ? a*(1-a) : 1 - a*a);
+          delta[j] = sum * dAct;
+        }
+      }
+      deltas.unshift(delta);
+    }
+    for (let l = 0; l < network.weights.length; l++) {
+      const prev = network.layers[l];
+      const curr = network.layers[l+1];
+      for (let iNode = 0; iNode < prev.size; iNode++) {
+        for (let jNode = 0; jNode < curr.size; jNode++) {
+          grads.weights[l][iNode][jNode] += deltas[l][jNode] * prev.a[iNode];
+        }
+      }
+      for (let jNode = 0; jNode < curr.size; jNode++) {
+        grads.bias[l][jNode] += deltas[l][jNode];
+      }
+    }
+    loss += 0.5*((output[0]-y[0])**2 + (output[1]-y[1])**2);
+  }
+  for(let l=0;l<grads.weights.length;l++){
+    for(let i=0;i<grads.weights[l].length;i++){
+      for(let j=0;j<grads.weights[l][i].length;j++){
+        grads.weights[l][i][j]/=data.pts.length;
+      }
+    }
+    for(let j=0;j<grads.bias[l].length;j++) grads.bias[l][j]/=data.pts.length;
+  }
+  optimizer.step(network, grads);
+  loss/=data.pts.length;
+  lossHistory.push(loss);
+  if(lossHistory.length>100) lossHistory.shift();
+  drawChart();
+  drawNetwork();
+}
+function trainLoop() {
+  step();
+  if (training) requestAnimationFrame(trainLoop);
+}
+layersInput.oninput = () => document.getElementById('layersValue').textContent = layersInput.value;
+neuronsInput.oninput = () => document.getElementById('neuronsValue').textContent = neuronsInput.value;
+logBtn.onclick = () => {
+  logDiv.style.display = logDiv.style.display === 'none' ? 'block' : 'none';
+};
+document.getElementById('initBtn').onclick = () => {
+  initializeNetwork();
+};
+document.getElementById('trainBtn').onclick = () => {
+  training = !training;
+  if (training) {
+    log('Training started');
+    trainLoop();
+  } else {
+    log('Training paused');
+  }
+};
+document.getElementById('resetBtn').onclick = () => {
+  training = false;
+  data = generateData(datasetInput.value);
+  initializeNetwork();
+  log('Reset done');
+};
+datasetInput.onchange = () => {
+  data = generateData(datasetInput.value);
+  initializeNetwork();
+};
+initializeNetwork();
+</script>
+</body>
+</html>
