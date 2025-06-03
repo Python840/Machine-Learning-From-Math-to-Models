@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neural Network Playground</title>
+<style>
+  :root {
+    --bg-color: #0b0c10;
+    --panel-bg: rgba(22, 27, 34, 0.85);
+    --accent: #58a6ff;
+    --accent-2: #ff7b72;
+    --text: #c9d1d9;
+    --grid-color: #30363d;
+    --neon-blue: #0ff;
+    --neon-green: #0f0;
+    --glass: rgba(255, 255, 255, 0.05);
+    --duration: 0.3s;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    color: var(--text);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-color);
+  }
+  body {
+    display: grid;
+    grid-template-rows: 60px 1fr 150px;
+    grid-template-columns: 260px 1fr 260px;
+    grid-template-areas:
+      "topbar topbar topbar"
+      "sidebar main settings"
+      "log log log";
+  }
+  #topbar {
+    grid-area: topbar;
+    background: linear-gradient(90deg, #111 0%, #1a1a1d 50%, #111 100%);
+    border-bottom: 1px solid var(--grid-color);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+  }
+  #topbar h1 {
+    margin: 0;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  #sidebar {
+    grid-area: sidebar;
+    background: var(--panel-bg);
+    padding: 20px;
+    overflow-y: auto;
+    backdrop-filter: blur(4px);
+  }
+  #settings {
+    grid-area: settings;
+    background: var(--panel-bg);
+    padding: 20px;
+    overflow-y: auto;
+    backdrop-filter: blur(4px);
+  }
+  #main {
+    grid-area: main;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  #log {
+    grid-area: log;
+    background: #161b22;
+    border-top: 1px solid var(--grid-color);
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-family: monospace;
+  }
+  canvas {
+    border: 1px solid var(--grid-color);
+    background: var(--glass);
+  }
+  .control-group {
+    margin-bottom: 15px;
+  }
+  label {
+    font-size: 13px;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+  }
+  input[type="range"], select, button, input[type="number"] {
+    width: 100%;
+    padding: 6px;
+    background: var(--bg-color);
+    border: 1px solid var(--grid-color);
+    color: var(--text);
+    border-radius: 4px;
+    transition: background var(--duration), box-shadow var(--duration), border-color var(--duration);
+  }
+  button:hover, select:hover, input[type="range"]:hover, input[type="number"]:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  button {
+    cursor: pointer;
+  }
+  .neon {
+    text-shadow: 0 0 2px var(--neon-blue), 0 0 4px var(--neon-blue), 0 0 6px var(--neon-blue);
+  }
+  #networkCanvas {
+    width: 800px;
+    height: 520px;
+  }
+  #lossCanvas {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    height: 120px;
+    border: 1px solid var(--grid-color);
+    background: var(--glass);
+  }
+  #histCanvas {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 300px;
+    height: 120px;
+    border: 1px solid var(--grid-color);
+    background: var(--glass);
+  }
+  #weightsModal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #0d1117;
+    border: 1px solid var(--accent);
+    padding: 20px;
+    box-shadow: 0 0 10px var(--accent);
+    z-index: 100;
+    display: none;
+  }
+  #weightsModal h3 {
+    margin-top: 0;
+    text-align: center;
+    color: var(--accent);
+  }
+  #weightsContent {
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: monospace;
+    white-space: pre;
+  }
+  #closeWeights {
+    width: 100%;
+    margin-top: 10px;
+  }
+  #tooltip {
+    position: absolute;
+    padding: 4px 8px;
+    background: #000a;
+    color: #fff;
+    border-radius: 4px;
+    pointer-events: none;
+    font-size: 12px;
+    display: none;
+    z-index: 200;
+  }
+  /* Background Animations */
+  #starfield {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    background: transparent;
+  }
+  @keyframes twinkle {
+    from { opacity: 0.2; }
+    50%  { opacity: 1; }
+    to   { opacity: 0.2; }
+  }
+  .star {
+    position: absolute;
+    background: #fff;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    animation: twinkle 2s infinite ease-in-out;
+  }
+
+  #matrixCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    display: none;
+  /* Theme styles */
+  body.cyber { background:#000214; }
+  body.cyber #topbar { background:linear-gradient(90deg,#011,#002,#011); }
+  body.cyber #sidebar, body.cyber #settings { background:rgba(0,20,40,0.9); }
+  body.cyber .neon { text-shadow:0 0 4px #0ff,0 0 8px #0ff; }
+  body.matrix { background:#001b00; color:#9f9; }
+  /* Additional futuristic buttons */
+  .btn{padding:8px 12px;border:1px solid var(--grid-color);background:var(--bg-color);color:var(--text);border-radius:4px;transition:box-shadow var(--duration);}
+  .btn:hover{box-shadow:0 0 6px var(--accent);}
+  .glass{background:rgba(255,255,255,0.1);backdrop-filter:blur(6px);}
+  @keyframes float{0%{transform:translateY(0);}50%{transform:translateY(-5px);}100%{transform:translateY(0);}}
+  .floating{animation:float 3s ease-in-out infinite;}
+
+  body.matrix #topbar { background:#002800; }
+  .palette-blue{color:#58a6ff;}
+  .palette-red{color:#ff7b72;}
+  .palette-green{color:#3fb950;}
+  .palette-yellow{color:#d29922;}
+  .panel{padding:10px;border:1px solid var(--grid-color);border-radius:4px;margin-bottom:10px;}
+  @keyframes glow{0%{box-shadow:0 0 2px var(--accent);}50%{box-shadow:0 0 8px var(--accent);}100%{box-shadow:0 0 2px var(--accent);}}
+  .glow-on-hover:hover{animation:glow 1s infinite;}
+
+  body.matrix #sidebar, body.matrix #settings { background:rgba(0,40,0,0.8); }
+  body.matrix canvas { background:rgba(0,40,0,0.5); }
+body.matrix #matrixCanvas{display:block;}
+
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    animation: twinkle 2s infinite ease-in-out;
+  }
+</style>
+</head>
+<body>
+<div id="starfield"></div>
+<canvas id="matrixCanvas"></canvas>
+<div id="topbar"><h1 class="neon">Neural Network Playground</h1></div>
+<div id="sidebar">
+  <div class="control-group">
+    <label for="layers">Layers: <span id="layersValue">3</span></label>
+    <input type="range" id="layers" min="1" max="10" value="3"/>
+  </div>
+  <div class="control-group">
+    <label for="neurons">Neurons/Layer: <span id="neuronsValue">4</span></label>
+    <input type="range" id="neurons" min="1" max="12" value="4"/>
+  </div>
+  <div class="control-group">
+    <label for="activation">Activation</label>
+    <select id="activation">
+      <option value="relu">ReLU</option>
+      <option value="leakyRelu">Leaky ReLU</option>
+      <option value="sigmoid">Sigmoid</option>
+      <option value="tanh">Tanh</option>
+      <option value="softplus">Softplus</option>
+      <option value="linear">Linear</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="optimizer">Optimizer</label>
+    <select id="optimizer">
+      <option value="sgd">SGD</option>
+      <option value="momentum">Momentum</option>
+      <option value="rmsprop">RMSProp</option>
+      <option value="adam">Adam</option>
+      <option value="adagrad">Adagrad</option>
+      <option value="nesterov">Nesterov</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="lr">Learning Rate</label>
+    <input type="number" id="lr" value="0.01" step="0.001" min="0"/>
+  </div>
+  <div class="control-group">
+    <label for="dropout">Dropout</label>
+    <input type="range" id="dropout" min="0" max="0.8" step="0.05" value="0"/>
+  </div>
+  <div class="control-group">
+    <label for="loss">Loss</label>
+    <select id="loss">
+      <option value="mse">MSE</option>
+      <option value="cross">Cross Entropy</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="clip">Grad Clip</label>
+    <input type="number" id="clip" value="1" step="0.1" min="0"/>
+  </div>
+  <div class="control-group">
+    <label for="dataset">Dataset</label>
+    <select id="dataset">
+      <option value="spiral">Spiral</option>
+      <option value="circle">Circle</option>
+      <option value="xor">XOR</option>
+      <option value="gaussian">Gaussian</option>
+      <option value="moons">Moons</option>
+      <option value="grid">Grid</option>
+      <option value="waves">Waves</option>
+      <option value="rings">Rings</option>
+      <option value="swiss">Swiss Roll</option>
+    </select>
+  </div>
+  <button id="initBtn">Initialize</button>
+  <button id="trainBtn">Train</button>
+  <button id="stepBtn">Step</button>
+  <button id="showWeightsBtn">Weights</button>
+  <button id="noiseBtn">Noise</button>
+  <button id="resetBtn">Reset</button>
+</div>
+<div id="main">
+  <canvas id="networkCanvas" width="800" height="520"></canvas>
+  <canvas id="lossCanvas" width="800" height="120"></canvas>
+  <canvas id="histCanvas" width="300" height="120"></canvas>
+</div>
+<div id="settings">
+  <div class="control-group">
+    <label for="particleToggle">Starfield</label>
+    <select id="particleToggle">
+      <option value="on">On</option>
+      <option value="off">Off</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="speed">Train Speed</label>
+    <input type="range" id="speed" min="1" max="10" value="5"/>
+  </div>
+  <div class="control-group">
+    <label for="theme">Theme</label>
+    <select id="theme">
+      <option value="dark">Dark</option>
+      <option value="cyber">Cyber</option>
+      <option value="matrix">Matrix</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label>Weights JSON</label>
+    <textarea id="weightsJSON" rows="4" style="width:100%;"></textarea>
+  </div>
+  <button id="loadWeights">Load Weights</button>
+  <button id="saveWeights">Save Weights</button>
+</div>
+<div id="weightsModal">
+  <h3>Weights</h3>
+  <div id="weightsContent"></div>
+  <button id="closeWeights">Close</button>
+</div>
+<div id="log"></div>
+<div id="tooltip"></div>
+<script>
+'use strict';
+/* Utility to create starfield background */
+const starfield=document.getElementById('starfield');
+function createStars(){
+  const count=100;
+  for(let i=0;i<count;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    s.style.left=Math.random()*100+'%';
+    s.style.top=Math.random()*100+'%';
+    s.style.animationDuration=(Math.random()*2+1)+'s';
+    starfield.appendChild(s);
+  }
+}
+const matrixCanvas=document.getElementById("matrixCanvas");
+const matrixCtx=matrixCanvas.getContext("2d");
+let matrixCols=[];
+function startMatrix(){
+  matrixCanvas.width=window.innerWidth;
+  matrixCanvas.height=window.innerHeight;
+  const cols=Math.floor(matrixCanvas.width/20);
+  matrixCols=new Array(cols).fill(0);
+}
+function drawMatrix(){
+  matrixCtx.fillStyle="rgba(0,0,0,0.05)";
+  matrixCtx.fillRect(0,0,matrixCanvas.width,matrixCanvas.height);
+  matrixCtx.fillStyle="#0f0";
+  matrixCols.forEach((y,i)=>{
+    const text=String.fromCharCode(0x30A0+Math.random()*96);
+    matrixCtx.fillText(text,i*20,y);
+    matrixCols[i]=y>matrixCanvas.height?0:y+20;
+  });
+  if(document.body.classList.contains("matrix")) requestAnimationFrame(drawMatrix);
+}
+startMatrix();
+
+window.addEventListener("resize",startMatrix);
+createStars();
+const layersInput=document.getElementById('layers');
+const neuronsInput=document.getElementById('neurons');
+const activationInput=document.getElementById('activation');
+const optimizerInput=document.getElementById('optimizer');
+const lrInput=document.getElementById('lr');
+const dropoutInput=document.getElementById('dropout');
+const datasetInput=document.getElementById('dataset');
+const particleToggle=document.getElementById('particleToggle');
+const speedInput=document.getElementById('speed');
+const themeInput=document.getElementById("theme");
+const logDiv=document.getElementById('log');
+const canvas=document.getElementById('networkCanvas');
+const lossInput=document.getElementById("loss");
+const clipInput=document.getElementById("clip");
+const ctx=canvas.getContext('2d');
+const chart=document.getElementById('lossCanvas');
+const chartCtx=chart.getContext('2d');
+const histCanvas=document.getElementById('histCanvas');
+const histCtx=histCanvas.getContext('2d');
+const weightsBtn=document.getElementById('showWeightsBtn');
+const weightsModal=document.getElementById('weightsModal');
+const weightsContent=document.getElementById('weightsContent');
+const closeWeights=document.getElementById('closeWeights');
+const tooltip=document.getElementById('tooltip');
+let network=null;
+let data=null;
+let training=false;
+let frameId=null;
+let optimizer=null;
+let lossHistory=[];
+function log(msg){
+  const p=document.createElement('div');
+  p.textContent=msg;
+  logDiv.appendChild(p);
+  logDiv.scrollTop=logDiv.scrollHeight;
+}
+class Layer{
+  constructor(size,activation){
+    this.size=size;
+    this.activation=activation;
+    this.bias=new Array(size).fill(0).map(()=>Math.random()*0.2-0.1);
+    this.z=new Array(size).fill(0);
+    this.a=new Array(size).fill(0);
+    this.dropoutMask=new Array(size).fill(1);
+  }
+}
+class Network{
+  constructor(sizes,activation){
+    this.layers=[];
+    for(let i=0;i<sizes.length;i++){
+      this.layers.push(new Layer(sizes[i],activation));
+    }
+    this.weights=[];
+    for(let i=0;i<sizes.length-1;i++){
+      const from=sizes[i];
+      const to=sizes[i+1];
+      const mat=[];
+      for(let j=0;j<from;j++){
+        mat.push(new Array(to).fill(0).map(()=>Math.random()*0.2-0.1));
+      }
+      this.weights.push(mat);
+    }
+  }
+  forward(x,drop){
+    this.layers[0].a=x.slice();
+    for(let l=1;l<this.layers.length;l++){
+      const prev=this.layers[l-1];
+      const curr=this.layers[l];
+      for(let j=0;j<curr.size;j++){
+        let sum=curr.bias[j];
+        for(let i=0;i<prev.size;i++){
+          sum+=prev.a[i]*this.weights[l-1][i][j];
+        }
+        curr.z[j]=sum;
+        curr.a[j]=activate(sum,curr.activation);
+        curr.dropoutMask[j]=(drop && l<this.layers.length-1&&Math.random()<drop)?0:1;
+        curr.a[j]*=curr.dropoutMask[j];
+      }
+    }
+    return this.layers[this.layers.length-1].a.slice();
+  }
+}
+function activate(x,a){
+  switch(a){
+    case 'relu': return Math.max(0,x);
+    case 'leakyRelu': return x>0?x:0.01*x;
+    case 'sigmoid': return 1/(1+Math.exp(-x));
+    case 'tanh': return Math.tanh(x);
+    case 'softplus': return Math.log(1+Math.exp(x));
+    default: return x;
+  }
+}
+class OptimizerBase{
+  constructor(lr){this.lr=lr;}
+  step(){}
+}
+class SGD extends OptimizerBase{
+  step(net,gr){
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          net.weights[l][i][j]-=this.lr*gr.w[l][i][j];
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        net.layers[l+1].bias[j]-=this.lr*gr.b[l][j];
+      }
+    }
+  }
+}
+class Momentum extends OptimizerBase{
+  constructor(lr,m=0.9){
+    super(lr);this.m=m;this.vw=[];this.vb=[];
+  }
+  step(net,gr){
+    if(!this.vw.length){
+      for(let l=0;l<net.weights.length;l++){
+        this.vw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.vb.push(new Array(net.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          this.vw[l][i][j]=this.m*this.vw[l][i][j]+(1-this.m)*gr.w[l][i][j];
+          net.weights[l][i][j]-=this.lr*this.vw[l][i][j];
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        this.vb[l][j]=this.m*this.vb[l][j]+(1-this.m)*gr.b[l][j];
+        net.layers[l+1].bias[j]-=this.lr*this.vb[l][j];
+      }
+    }
+  }
+}
+class RMSProp extends OptimizerBase{
+  constructor(lr,d=0.9,eps=1e-8){
+    super(lr);this.d=d;this.eps=eps;this.sw=[];this.sb=[];
+  }
+  step(net,gr){
+    if(!this.sw.length){
+      for(let l=0;l<net.weights.length;l++){
+        this.sw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.sb.push(new Array(net.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          this.sw[l][i][j]=this.d*this.sw[l][i][j]+(1-this.d)*gr.w[l][i][j]*gr.w[l][i][j];
+          net.weights[l][i][j]-=this.lr*gr.w[l][i][j]/Math.sqrt(this.sw[l][i][j]+this.eps);
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        this.sb[l][j]=this.d*this.sb[l][j]+(1-this.d)*gr.b[l][j]*gr.b[l][j];
+        net.layers[l+1].bias[j]-=this.lr*gr.b[l][j]/Math.sqrt(this.sb[l][j]+this.eps);
+      }
+    }
+  }
+}
+class Adam extends OptimizerBase{
+  constructor(lr,b1=0.9,b2=0.999,eps=1e-8){
+    super(lr);this.b1=b1;this.b2=b2;this.eps=eps;this.mw=[];this.vw=[];this.mb=[];this.vb=[];this.t=0;
+  }
+  step(net,gr){
+    if(!this.mw.length){
+      for(let l=0;l<net.weights.length;l++){
+        this.mw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.vw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.mb.push(new Array(net.layers[l+1].bias.length).fill(0));
+        this.vb.push(new Array(net.layers[l+1].bias.length).fill(0));
+      }
+    }
+    this.t++;
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          this.mw[l][i][j]=this.b1*this.mw[l][i][j]+(1-this.b1)*gr.w[l][i][j];
+          this.vw[l][i][j]=this.b2*this.vw[l][i][j]+(1-this.b2)*gr.w[l][i][j]*gr.w[l][i][j];
+          const mc=this.mw[l][i][j]/(1-Math.pow(this.b1,this.t));
+          const vc=this.vw[l][i][j]/(1-Math.pow(this.b2,this.t));
+          net.weights[l][i][j]-=this.lr*mc/(Math.sqrt(vc)+this.eps);
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        this.mb[l][j]=this.b1*this.mb[l][j]+(1-this.b1)*gr.b[l][j];
+        this.vb[l][j]=this.b2*this.vb[l][j]+(1-this.b2)*gr.b[l][j]*gr.b[l][j];
+        const mc=this.mb[l][j]/(1-Math.pow(this.b1,this.t));
+        const vc=this.vb[l][j]/(1-Math.pow(this.b2,this.t));
+        net.layers[l+1].bias[j]-=this.lr*mc/(Math.sqrt(vc)+this.eps);
+      }
+    }
+  }
+}
+
+class Adagrad extends OptimizerBase{
+  constructor(lr,eps=1e-8){
+    super(lr);this.eps=eps;this.sw=[];this.sb=[];
+  }
+  step(net,gr){
+    if(!this.sw.length){
+      for(let l=0;l<net.weights.length;l++){
+        this.sw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.sb.push(new Array(net.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          this.sw[l][i][j]+=gr.w[l][i][j]*gr.w[l][i][j];
+          net.weights[l][i][j]-=this.lr*gr.w[l][i][j]/Math.sqrt(this.sw[l][i][j]+this.eps);
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        this.sb[l][j]+=gr.b[l][j]*gr.b[l][j];
+        net.layers[l+1].bias[j]-=this.lr*gr.b[l][j]/Math.sqrt(this.sb[l][j]+this.eps);
+      }
+    }
+  }
+}
+
+class Nesterov extends Momentum{
+  step(net,gr){
+    if(!this.vw.length){
+      for(let l=0;l<net.weights.length;l++){
+        this.vw.push(net.weights[l].map(r=>r.map(()=>0)));
+        this.vb.push(new Array(net.layers[l+1].bias.length).fill(0));
+      }
+    }
+    for(let l=0;l<net.weights.length;l++){
+      for(let i=0;i<net.weights[l].length;i++){
+        for(let j=0;j<net.weights[l][i].length;j++){
+          this.vw[l][i][j]=this.m*this.vw[l][i][j]+this.lr*gr.w[l][i][j];
+          net.weights[l][i][j]-=this.m*this.vw[l][i][j]+this.lr*gr.w[l][i][j];
+        }
+      }
+      for(let j=0;j<net.layers[l+1].bias.length;j++){
+        this.vb[l][j]=this.m*this.vb[l][j]+this.lr*gr.b[l][j];
+        net.layers[l+1].bias[j]-=this.m*this.vb[l][j]+this.lr*gr.b[l][j];
+      }
+    }
+  }
+}
+function generateData(type){
+  const pts=[];
+  const labels=[];
+  if(type==="spiral"){
+    const N=150;
+    for(let i=0;i<N;i++){
+      const r=i/N;
+      const t=4*Math.PI*r+Math.random()*0.2;
+      const x=r*Math.cos(t);
+      const y=r*Math.sin(t);
+      pts.push([x,y]);
+      labels.push(t%(2*Math.PI)<Math.PI?0:1);
+    }
+  }else if(type==="circle"){
+    const N=150;
+    for(let i=0;i<N;i++){
+      const angle=Math.random()*2*Math.PI;
+      const r=Math.random();
+      const x=r*Math.cos(angle);
+      const y=r*Math.sin(angle);
+      pts.push([x,y]);
+      labels.push(r>0.5?1:0);
+    }
+  }else if(type==="xor"){
+    for(let i=0;i<300;i++){
+      const x=Math.random()>0.5?1:0;
+      const y=Math.random()>0.5?1:0;
+      pts.push([x,y]);
+      labels.push(x^y);
+    }
+  }else if(type==="gaussian"){
+    for(let i=0;i<200;i++){
+      const x=Math.random()*2-1;
+      const y=Math.random()*2-1;
+      pts.push([x,y]);
+      labels.push(Math.random()>0.5?1:0);
+    }
+  }else if(type==="moons"){
+    const N=150;
+    for(let i=0;i<N;i++){
+      const angle=Math.PI*i/N;
+      const x=Math.cos(angle)+0.1*Math.random();
+      const y=Math.sin(angle)+0.1*Math.random();
+      pts.push([x,y]);
+      labels.push(i<N/2?0:1);
+    }
+  }else if(type==="grid"){
+    const N=10;
+    for(let i=0;i<N;i++){
+      for(let j=0;j<N;j++){
+        pts.push([i/N-0.5,j/N-0.5]);
+        labels.push((i+j)%2);
+      }
+    }
+  }else if(type==="waves"){
+    const N=300;
+    for(let i=0;i<N;i++){
+      const x=i/N*4-2;
+      const y=Math.sin(2*x)+0.2*Math.random();
+      pts.push([x/2,y/2]);
+      labels.push(y>0?1:0);
+    }
+  }else if(type==="rings"){
+    const N=200;
+    for(let i=0;i<N;i++){
+      const angle=Math.random()*2*Math.PI;
+      const radius=(i%2===0?0.5:1)+0.05*Math.random();
+      const x=radius*Math.cos(angle);
+      const y=radius*Math.sin(angle);
+      pts.push([x,y]);
+      labels.push(i%2);
+    }
+  }else if(type==="swiss"){
+    const N=300;
+    for(let i=0;i<N;i++){
+      const t=1.5*Math.PI*(1+2*i/N);
+      const x=t*Math.cos(t)/15;
+      const y=t*Math.sin(t)/15;
+      pts.push([x,y]);
+      labels.push(i%2);
+    }
+  }
+  return {pts,labels};
+}
+function drawPoints(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const scale=250;
+  const cs=getComputedStyle(document.documentElement);
+  const colA=cs.getPropertyValue('--accent').trim()||'#58a6ff';
+  const colB=cs.getPropertyValue('--accent-2').trim()||'#ff7b72';
+  for(let i=0;i<data.pts.length;i++){
+    const p=data.pts[i];
+    ctx.fillStyle=data.labels[i]?colB:colA;
+    ctx.beginPath();
+    ctx.arc(canvas.width/2+p[0]*scale,canvas.height/2+p[1]*scale,4,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+function drawNetwork(){
+  drawPoints();
+  const gapX=canvas.width/(network.layers.length+1);
+  for(let l=0;l<network.layers.length;l++){
+    const layer=network.layers[l];
+    const gapY=canvas.height/(layer.size+1);
+    for(let n=0;n<layer.size;n++){
+      const x=gapX*(l+1);
+      const y=gapY*(n+1);
+      ctx.beginPath();
+      ctx.fillStyle='#8b949e';
+      ctx.arc(x,y,10,0,Math.PI*2);
+      ctx.fill();
+      if(l>0){
+        const prev=network.layers[l-1];
+        const prevGap=canvas.height/(prev.size+1);
+        for(let p=0;p<prev.size;p++){
+          const px=gapX*l;
+          const py=prevGap*(p+1);
+          const w=network.weights[l-1][p][n];
+          ctx.beginPath();
+          ctx.moveTo(px,py);
+          ctx.lineTo(x,y);
+          ctx.strokeStyle=w>0?`rgba(88,166,255,${Math.abs(w)})`:`rgba(255,123,114,${Math.abs(w)})`;
+          ctx.lineWidth=2;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+function drawChart(){
+  chartCtx.clearRect(0,0,chart.width,chart.height);
+  chartCtx.strokeStyle=var(--accent);
+  chartCtx.beginPath();
+  for(let i=0;i<lossHistory.length;i++){
+    const x=i/(lossHistory.length-1)*chart.width;
+    const y=chart.height-lossHistory[i]*chart.height;
+    if(i===0)chartCtx.moveTo(x,y);else chartCtx.lineTo(x,y);
+  }
+  chartCtx.stroke();
+}
+
+function drawHist(){
+  histCtx.clearRect(0,0,histCanvas.width,histCanvas.height);
+  if(!network) return;
+  const allWeights=[];
+  for(let l=0;l<network.weights.length;l++){
+    for(let i=0;i<network.weights[l].length;i++){
+      for(let j=0;j<network.weights[l][i].length;j++){
+        allWeights.push(network.weights[l][i][j]);
+      }
+    }
+  }
+  const bins=new Array(20).fill(0);
+  const min=-1,max=1;
+  const step=(max-min)/bins.length;
+  for(const w of allWeights){
+    const idx=Math.min(bins.length-1,Math.floor((w-min)/step));
+    bins[idx]++;
+  }
+  const maxBin=Math.max(...bins);
+  histCtx.fillStyle="#444";
+  for(let i=0;i<bins.length;i++){
+    const h=bins[i]/maxBin*histCanvas.height;
+    histCtx.fillRect(i*(histCanvas.width/bins.length),histCanvas.height-h,(histCanvas.width/bins.length)-2,h);
+  }
+}
+function initialize(){
+  const layers=parseInt(layersInput.value);
+  const neurons=parseInt(neuronsInput.value);
+  const sizes=new Array(layers).fill(neurons);
+  sizes.unshift(data.pts[0].length);
+  sizes.push(2);
+  network=new Network(sizes,activationInput.value);
+  const lr=parseFloat(lrInput.value);
+  const opt=optimizerInput.value;
+  if(opt==='sgd')optimizer=new SGD(lr);
+  else if(opt==='momentum')optimizer=new Momentum(lr,0.9);
+  else if(opt==='rmsprop')optimizer=new RMSProp(lr);
+  else if(opt==='adam')optimizer=new Adam(lr);
+  else if(opt==='adagrad')optimizer=new Adagrad(lr);
+  else optimizer=new Nesterov(lr,0.9);
+  lossHistory=[];
+  drawNetwork();
+  drawChart();
+  drawHist();
+  log('Network initialized with '+opt);
+}
+function computeGradients(){
+  const grads={w:[],b:[]};
+  const clipVal=parseFloat(clipInput.value);
+  const useCross=lossInput.value==="cross";
+  for(let l=0;l<network.weights.length;l++){
+    grads.w.push(network.weights[l].map(r=>r.map(()=>0)));
+    grads.b.push(new Array(network.layers[l+1].bias.length).fill(0));
+  }
+  let loss=0;
+  const drop=parseFloat(dropoutInput.value);
+  for(let idx=0;idx<data.pts.length;idx++){
+    const x=data.pts[idx];
+    const y=[data.labels[idx],1-data.labels[idx]];
+    const out=network.forward(x,drop);
+    const deltas=[];
+    for(let l=network.layers.length-1;l>=1;l--){
+      const layer=network.layers[l];
+      const delta=new Array(layer.size).fill(0);
+      if(l===network.layers.length-1){
+        for(let j=0;j<layer.size;j++) delta[j]=out[j]-y[j];
+      }else{
+        const next=deltas[0];
+        for(let j=0;j<layer.size;j++){
+          let sum=0;
+          for(let k=0;k<next.length;k++) sum+=next[k]*network.weights[l][j][k];
+          const a=layer.a[j];
+          const dAct=layer.activation==='relu'? (a>0?1:0) :
+                     layer.activation==='leakyRelu'? (a>0?1:0.01) :
+                     layer.activation==='sigmoid'? a*(1-a) :
+                     layer.activation==='tanh'? (1-a*a) :
+                     layer.activation==='softplus'? 1/(1+Math.exp(-layer.z[j])) :
+                     1;
+          delta[j]=sum*dAct*layer.dropoutMask[j];
+        }
+      }
+      deltas.unshift(delta);
+    }
+    for(let l=0;l<network.weights.length;l++){
+      const prev=network.layers[l];
+      const curr=network.layers[l+1];
+      for(let i=0;i<prev.size;i++){
+        for(let j=0;j<curr.size;j++) grads.w[l][i][j]+=deltas[l][j]*prev.a[i];
+      }
+      for(let j=0;j<curr.size;j++) grads.b[l][j]+=deltas[l][j];
+    }
+    if(useCross){
+      loss+=-(y[0]*Math.log(out[0]+1e-8)+y[1]*Math.log(out[1]+1e-8));
+    }else{
+      loss+=0.5*((out[0]-y[0])**2+(out[1]-y[1])**2);
+    }
+  }
+  for(let l=0;l<grads.w.length;l++){
+    for(let i=0;i<grads.w[l].length;i++){
+      for(let j=0;j<grads.w[l][i].length;j++){
+        grads.w[l][i][j]/=data.pts.length;
+        grads.w[l][i][j]=Math.max(-clipVal,Math.min(clipVal,grads.w[l][i][j]));
+      }
+    }
+    for(let j=0;j<grads.b[l].length;j++){
+      grads.b[l][j]/=data.pts.length;
+      grads.b[l][j]=Math.max(-clipVal,Math.min(clipVal,grads.b[l][j]));
+    }
+  }
+  loss/=data.pts.length;
+  return {grads,loss};
+}
+
+function addNoise(){
+  if(!network) return;
+  for(let l=0;l<network.weights.length;l++){
+    for(let i=0;i<network.weights[l].length;i++){
+      for(let j=0;j<network.weights[l][i].length;j++){
+        network.weights[l][i][j]+=Math.random()*0.2-0.1;
+      }
+    }
+    for(let j=0;j<network.layers[l+1].bias.length;j++){
+      network.layers[l+1].bias[j]+=Math.random()*0.2-0.1;
+    }
+  }
+  drawNetwork();
+  log('Weights perturbed');
+}
+function step(){
+  if(!training)return;
+  const {grads,loss}=computeGradients();
+  optimizer.step(network,grads);
+  lossHistory.push(loss);
+  if(lossHistory.length>200)lossHistory.shift();
+  drawNetwork();
+  drawChart();
+  drawHist();
+}
+function loop(){
+  step();
+  if(training){
+    const speed=11-parseInt(speedInput.value);
+    frameId=setTimeout(()=>requestAnimationFrame(loop),speed*10);
+  }
+}
+function openWeights(){
+  let txt='';
+  for(let l=0;l<network.weights.length;l++){
+    txt+='Layer '+(l+1)+'\n';
+    for(let i=0;i<network.weights[l].length;i++){
+      txt+=JSON.stringify(network.weights[l][i])+"\n";
+    }
+    txt+='Bias '+JSON.stringify(network.layers[l+1].bias)+"\n";
+    txt+='\n';
+  }
+  weightsContent.textContent=txt;
+  weightsModal.style.display='block';
+}
+function saveWeights(){
+  const obj={weights:network.weights,bias:network.layers.slice(1).map(l=>l.bias)};
+  document.getElementById("weightsJSON").value=JSON.stringify(obj, null, 2);
+}
+function loadWeights(){
+  try{
+    const obj=JSON.parse(document.getElementById("weightsJSON").value);
+    for(let l=0;l<network.weights.length;l++){
+      network.weights[l]=obj.weights[l];
+      network.layers[l+1].bias=obj.bias[l];
+    }
+    drawNetwork();
+    log("Weights loaded");
+  }catch(e){
+    log("Invalid JSON");
+  }
+}
+
+function closeWeightsModal(){
+  weightsModal.style.display='none';
+}
+layersInput.oninput=()=>document.getElementById('layersValue').textContent=layersInput.value;
+neuronsInput.oninput=()=>document.getElementById('neuronsValue').textContent=neuronsInput.value;
+datasetInput.onchange=()=>{data=generateData(datasetInput.value);initialize();};
+particleToggle.onchange=()=>{starfield.style.display=particleToggle.value==='on'?'block':'none';};
+document.getElementById('initBtn').onclick=()=>{initialize();};
+document.getElementById('trainBtn').onclick=()=>{training=!training;if(training){log('Training...');loop();}else{log('Paused');}}
+document.getElementById('stepBtn').onclick=()=>{step();}
+document.getElementById('noiseBtn').onclick=()=>{addNoise();}
+weightsBtn.onclick=openWeights;
+closeWeights.onclick=closeWeightsModal;
+document.getElementById('resetBtn').onclick=()=>{
+  training=false;
+  if(frameId)clearTimeout(frameId);
+  data=generateData(datasetInput.value);
+  initialize();
+  log('Reset');
+};
+window.addEventListener('click',e=>{if(e.target===weightsModal)closeWeightsModal();});
+canvas.addEventListener('mousemove',e=>{
+  if(!network)return;
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  const gapX=canvas.width/(network.layers.length+1);
+  for(let l=0;l<network.layers.length;l++){
+    const layer=network.layers[l];
+    const gapY=canvas.height/(layer.size+1);
+    for(let n=0;n<layer.size;n++){
+      const x=gapX*(l+1);
+      const y=gapY*(n+1);
+      if(Math.hypot(mx-x,my-y)<10){
+        tooltip.style.left=e.pageX+10+'px';
+        tooltip.style.top=e.pageY+10+'px';
+        tooltip.textContent='a='+layer.a[n].toFixed(2);
+        tooltip.style.display='block';
+        return;
+      }
+    }
+  }
+  tooltip.style.display='none';
+});
+canvas.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+/* Initial setup */
+data=generateData(datasetInput.value);
+themeInput.onchange=()=>{document.body.className=themeInput.value;if(themeInput.value==="matrix"){startMatrix();drawMatrix();}};
+loadWeights.onclick=loadWeights;
+saveWeights.onclick=saveWeights;
+initialize();
+</script>
+</body>
+</html>
